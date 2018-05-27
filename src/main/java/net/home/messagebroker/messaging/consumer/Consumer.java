@@ -14,6 +14,6 @@ public class Consumer {
     private final String name;
 
     public void receiveMessage(String topic, String message) {
-        LOGGER.info("Consumer '{}' successfully receives message '{}' from topic '{}'", this, message, topic);
+        LOGGER.info("Consumer '{}' successfully receives message '{}' from topic '{}'", getName(), message, topic);
     }
 }

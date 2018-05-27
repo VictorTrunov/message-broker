@@ -6,7 +6,6 @@ import net.home.messagebroker.messaging.consumer.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +28,6 @@ public class MessagingService {
     private TopicService topicService;
 
     @Autowired
-    @Qualifier("taskExecutor")
     private ThreadPoolTaskExecutor taskExecutor;
 
     public void postMessage(Message message) {
