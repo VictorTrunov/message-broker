@@ -23,17 +23,21 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = MessageBrokerApplication.class)
 @WebAppConfiguration
-public class TopicControllerTest {
+public class MessageBrokerTest {
 
-    private MediaType contentType = new MediaType(MediaType.APPLICATION_JSON.getType(),
+    private final MediaType contentType = new MediaType(MediaType.APPLICATION_JSON.getType(),
             MediaType.APPLICATION_JSON.getSubtype(), StandardCharsets.UTF_8);
 
     private MockMvc mockMvc;
@@ -47,14 +51,14 @@ public class TopicControllerTest {
 
     private HttpMessageConverter mappingJackson2HttpMessageConverter;
 
-    private Set<Integer> topicIds = new HashSet<>();
+    private final Set<Integer> topicIds = new HashSet<>();
 
-    private Set<Integer> customerIds = new HashSet<>();
+    private final ConcurrentMap<Integer, List<Integer>> customersOfTopics = new ConcurrentHashMap<>();
 
     @Autowired
     void setConverters(HttpMessageConverter<?>[] converters) {
 
-        this.mappingJackson2HttpMessageConverter = Arrays.asList(converters).stream()
+        this.mappingJackson2HttpMessageConverter = Arrays.stream(converters)
                 .filter(hmc -> hmc instanceof MappingJackson2HttpMessageConverter)
                 .findAny()
                 .orElse(null);
@@ -72,12 +76,24 @@ public class TopicControllerTest {
         taskExecutor.getThreadPoolExecutor().invokeAll(tasks);
     }
 
+    /**
+     * Тест имитирует работу брокера - прием сообщений, удаление случайныйх топиков,
+     * отмена подписки случайных подписчиков
+     *
+     */
     @Test
-    public void sendMessagesAndRemoveTopicsAndUnsubscribeConsumers() throws Exception {
+    public void sendMessagesAndRemoveTopicsAndUnsubscribeConsumers() {
         int maxTopicPerMessageCount = 20;
         int count = 50000;
+        int maxTopicCountToRemove = topicIds.size() / 3;
+        int maxCustomerCountToUnsubscribe = customersOfTopics.size() / 4;
+        Random random = new Random();
         List<Callable<Void>> postMessageTasks = buildPostMessageTasks(count, maxTopicPerMessageCount);
-        taskExecutor.getThreadPoolExecutor().invokeAll(postMessageTasks);
+        List<Callable<Void>> removeTopicTasks = buildRemoveTopicTasks(random.nextInt(maxTopicCountToRemove) + 1);
+        List<Callable<Void>> unsubscribeCustomerTasks = buildUnsubscribeCustomerTasks(random.nextInt(maxCustomerCountToUnsubscribe) + 1);
+        postMessageTasks.forEach(taskExecutor::submit);
+        removeTopicTasks.forEach(taskExecutor::submit);
+        unsubscribeCustomerTasks.forEach(taskExecutor::submit);
     }
 
     private List<Callable<Void>> buildCreateCustomersTasks(int customerCount, int topicCount) {
@@ -87,7 +103,9 @@ public class TopicControllerTest {
             int topicNumber = random.nextInt(topicCount);
             topicIds.add(topicNumber);
             int customerNumber = random.nextInt(customerCount);
-            customerIds.add(customerNumber);
+            List<Integer> customerTopic =
+                    customersOfTopics.computeIfAbsent(customerNumber, k -> new ArrayList());
+            customerTopic.add(topicNumber);
             tasks.add(createCustomerTask(topicNumber, customerNumber));
         }
         return tasks;
@@ -124,8 +142,7 @@ public class TopicControllerTest {
 
     private String json(Object o) throws IOException {
         MockHttpOutputMessage mockHttpOutputMessage = new MockHttpOutputMessage();
-        this.mappingJackson2HttpMessageConverter.write(
-                o, MediaType.APPLICATION_JSON, mockHttpOutputMessage);
+        this.mappingJackson2HttpMessageConverter.write(o, MediaType.APPLICATION_JSON, mockHttpOutputMessage);
         return mockHttpOutputMessage.getBodyAsString();
     }
 
@@ -146,6 +163,52 @@ public class TopicControllerTest {
             topicNames.add("topic" + list.get(random.nextInt(list.size())));
         }
         return topicNames;
+    }
+
+    private List<Callable<Void>> buildRemoveTopicTasks(int maxTopicCountToRemove) {
+        Set<Integer> topicIdsToRemove = new HashSet<>();
+        Random random = new Random();
+        List<Integer> topics = new ArrayList<>(topicIds);
+        for (int i = 0; i < maxTopicCountToRemove; i++) {
+            topicIdsToRemove.add(topics.get(random.nextInt(topicIds.size())));
+        }
+        return topicIdsToRemove.stream()
+                .map(this::buildRemoveTopicTask)
+                .collect(Collectors.toList());
+    }
+
+    private Callable<Void> buildRemoveTopicTask(Integer topicId) {
+        return () -> {
+            mockMvc.perform(delete("/topic/topic" + topicId));
+            return null;
+        };
+    }
+
+    private List<Callable<Void>> buildUnsubscribeCustomerTasks(int maxCustomerCountToUnsubscribe) {
+        List<Callable<Void>> tasks = new ArrayList<>();
+        Set<Integer> customerIdsToUnsubscribe = new HashSet<>();
+        Random random = new Random();
+        List<Integer> customers = new ArrayList<>(customersOfTopics.keySet());
+        for (int i = 0; i < maxCustomerCountToUnsubscribe; i++) {
+            customerIdsToUnsubscribe.add(customers.get(random.nextInt(customersOfTopics.size())));
+        }
+        customerIdsToUnsubscribe.forEach(customerId -> {
+            int topicCount = customersOfTopics.get(customerId).size();
+            int topicId = customersOfTopics.get(customerId).get(random.nextInt(topicCount));
+            tasks.add(createUnsubscribeCustomerTask(customerId, topicId));
+        });
+        return tasks;
+    }
+
+    private Callable<Void> createUnsubscribeCustomerTask(Integer integer, int topicId) {
+        return () -> {
+            mockMvc.perform(unsubscribeCustomer(topicId, integer));
+            return null;
+        };
+    }
+
+    private MockHttpServletRequestBuilder unsubscribeCustomer(int topicNumber, int customerNumber) {
+        return delete("/subscription/topic" + topicNumber + "/customer" + customerNumber);
     }
 
 

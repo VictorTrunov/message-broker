@@ -10,9 +10,10 @@ public class TestThreadConfig {
     @Bean("testTaskExecutor")
     public ThreadPoolTaskExecutor getTaskExecutor() {
         ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-        int maxPoolSize = Runtime.getRuntime().availableProcessors();
-        taskExecutor.setMaxPoolSize(maxPoolSize);
-        taskExecutor.setThreadNamePrefix("test-pool");
+        int poolSize = Runtime.getRuntime().availableProcessors();
+        taskExecutor.setCorePoolSize(poolSize);
+        taskExecutor.setMaxPoolSize(10 * poolSize);
+        taskExecutor.setThreadNamePrefix("test-pool-");
         taskExecutor.setWaitForTasksToCompleteOnShutdown(true);
         return  taskExecutor;
 

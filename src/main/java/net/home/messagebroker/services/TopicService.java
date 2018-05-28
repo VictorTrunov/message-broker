@@ -34,7 +34,7 @@ public class TopicService {
 
     public Set<Topic> getOrCreateTopics(Set<String> topicsNames) {
         return topicsNames.stream()
-                .map(topicName -> getOrCreateTopic(topicName))
+                .map(this::getOrCreateTopic)
                 .collect(Collectors.toSet());
     }
 

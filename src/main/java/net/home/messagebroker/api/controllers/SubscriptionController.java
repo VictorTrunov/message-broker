@@ -30,19 +30,18 @@ public class SubscriptionController {
         return subscriptionService.getConsumers(topic);
     }
 
-    @DeleteMapping("/{consumer}")
-    public void unsubscribe(@PathVariable(name = "topic") String topic,
-                            @PathVariable(name = "consumer") String consumer) {
-        subscriptionService.unsubscribeConsumer(topicService.getOrCreateTopic(topic), consumer);
-        LOGGER.info("Consumer '{}' unsubscribed from topic '{}'", consumer, topic);
-    }
-
-
     @PostMapping("/{consumer}")
     public void subscribe(@PathVariable(name = "topic") String topic,
                           @PathVariable(name = "consumer") String consumer) {
         subscriptionService.subscribeConsumer(topicService.getOrCreateTopic(topic), consumer);
         LOGGER.info("Consumer '{}' was subscribed on topic '{}'", consumer, topic);
+    }
+
+    @DeleteMapping("/{consumer}")
+    public void unsubscribe(@PathVariable(name = "topic") String topic,
+                            @PathVariable(name = "consumer") String consumer) {
+        subscriptionService.unsubscribeConsumer(topicService.getOrCreateTopic(topic), consumer);
+        LOGGER.info("Consumer '{}' unsubscribed from topic '{}'", consumer, topic);
     }
 
 }
