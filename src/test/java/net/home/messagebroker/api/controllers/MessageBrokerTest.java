@@ -5,6 +5,8 @@ import net.home.messagebroker.messaging.Message;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,14 +30,16 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertNotNull;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = MessageBrokerApplication.class)
 @WebAppConfiguration
 public class MessageBrokerTest {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageBrokerTest.class);
 
     private final MediaType contentType = new MediaType(MediaType.APPLICATION_JSON.getType(),
             MediaType.APPLICATION_JSON.getSubtype(), StandardCharsets.UTF_8);
@@ -82,7 +86,7 @@ public class MessageBrokerTest {
      *
      */
     @Test
-    public void sendMessagesAndRemoveTopicsAndUnsubscribeConsumers() {
+    public void sendMessagesAndRemoveTopicsAndUnsubscribeConsumers() throws Exception {
         int maxTopicPerMessageCount = 20;
         int count = 50000;
         int maxTopicCountToRemove = topicIds.size() / 3;
@@ -94,6 +98,14 @@ public class MessageBrokerTest {
         postMessageTasks.forEach(taskExecutor::submit);
         removeTopicTasks.forEach(taskExecutor::submit);
         unsubscribeCustomerTasks.forEach(taskExecutor::submit);
+        while (taskExecutor.getActiveCount() > 0) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                LOGGER.error("Exception ", e);
+            }
+        }
+        mockMvc.perform(get("/topic")).andExpect(status().isOk());
     }
 
     private List<Callable<Void>> buildCreateCustomersTasks(int customerCount, int topicCount) {
