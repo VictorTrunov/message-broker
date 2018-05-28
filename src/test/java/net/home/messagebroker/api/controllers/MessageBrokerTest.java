@@ -92,12 +92,12 @@ public class MessageBrokerTest {
         int maxTopicCountToRemove = topicIds.size() / 3;
         int maxCustomerCountToUnsubscribe = customersOfTopics.size() / 4;
         Random random = new Random();
+        Set<Callable<Void>> tasks = new HashSet<>();
         List<Callable<Void>> postMessageTasks = buildPostMessageTasks(count, maxTopicPerMessageCount);
-        List<Callable<Void>> removeTopicTasks = buildRemoveTopicTasks(random.nextInt(maxTopicCountToRemove) + 1);
-        List<Callable<Void>> unsubscribeCustomerTasks = buildUnsubscribeCustomerTasks(random.nextInt(maxCustomerCountToUnsubscribe) + 1);
+        tasks.addAll(buildRemoveTopicTasks(random.nextInt(maxTopicCountToRemove) + 1));
+        tasks.addAll(buildUnsubscribeCustomerTasks(random.nextInt(maxCustomerCountToUnsubscribe) + 1));
         postMessageTasks.forEach(taskExecutor::submit);
-        removeTopicTasks.forEach(taskExecutor::submit);
-        unsubscribeCustomerTasks.forEach(taskExecutor::submit);
+        new ArrayList<>(tasks).forEach(taskExecutor::submit);
         while (taskExecutor.getActiveCount() > 0) {
             try {
                 Thread.sleep(1000);

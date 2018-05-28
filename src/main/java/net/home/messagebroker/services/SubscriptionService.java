@@ -33,7 +33,7 @@ public class SubscriptionService {
         Set<Consumer> consumers = consumersOfTopic
                 .computeIfAbsent(requireNonNull(topic), t -> ConcurrentHashMap.newKeySet());
         consumers.add(requireNonNull(consumer));
-        LOGGER.info("Consumer '{}' was subscribed on topic '{}'", consumer, topic);
+        LOGGER.info("Consumer '{}' was subscribed on topic '{}'", consumer.getName(), topic.getName());
     }
 
     public void unsubscribeConsumer(Topic topic, String consumerName) {
@@ -43,9 +43,9 @@ public class SubscriptionService {
     public void unsubscribeConsumer(Topic topic, Consumer consumer) {
         if (consumersOfTopic.containsKey(requireNonNull(topic))) {
             boolean result = consumersOfTopic.get(topic).remove(requireNonNull(consumer));
-            LOGGER.info("Consumer with name '{}' was {} from topic '{}'", consumer, result ? "unsubscribed" : "not found", topic);
+            LOGGER.info("Consumer '{}' was {} from topic '{}'", consumer.getName(), result ? "unsubscribed" : "not found", topic.getName());
         } else {
-            LOGGER.info("Topic '{}' not found", topic);
+            LOGGER.info("Topic '{}' not found", topic.getName());
         }
     }
 
